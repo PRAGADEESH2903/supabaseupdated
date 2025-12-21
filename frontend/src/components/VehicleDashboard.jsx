@@ -25,7 +25,7 @@ export default function VehicleDashboard() {
   }, []);
 
   const loadDashboard = async () => {
-    // ✅ Health check
+    // 🔹 Health check
     try {
       await axios.get(`${API_BASE_URL}/api/health`);
     } catch {
