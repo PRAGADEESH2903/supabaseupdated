@@ -13,8 +13,8 @@ import {
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-export const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "https://supabaseupdated.onrender.com";
+import { API_BASE_URL } from "../config";
+axios.get(`${API_BASE_URL}/api/customers`);
 
 
 /* ================= VALIDATION ================= */
