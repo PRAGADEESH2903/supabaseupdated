@@ -14,6 +14,9 @@ import {
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import { API_BASE_URL } from "../config";
+axios.get(`${API_BASE_URL}/api/health`);
+
 
 // Order: Customers → Vehicles → Services → Dealers → Purchases
 const navItems = [
