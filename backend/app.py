@@ -10,7 +10,6 @@ from supabase import Client
 from supabase_client import get_backend_port, get_supabase_client
 from email_utils import send_email
 
-
 # =====================================================
 # APP INIT
 # =====================================================
@@ -44,18 +43,24 @@ def parse_date(value: Optional[str]) -> Optional[str]:
     return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
 
 # =====================================================
-# HEALTH CHECK
+# HEALTH CHECKS
 # =====================================================
 @app.route("/", methods=["GET"])
-def health_check():
+def root_health():
     return {
         "status": "ok",
         "message": "Showroom backend is running"
     }
 
+@app.route("/api/health", methods=["GET"])
+def api_health():
+    return jsonify({
+        "status": "ok",
+        "message": "API is healthy"
+    })
 
 # =====================================================
-# CUSTOMERS (FIXES "Failed to load customers")
+# CUSTOMERS
 # =====================================================
 @app.route("/api/customers", methods=["GET"])
 def list_customers():
@@ -235,7 +240,7 @@ def customer_full_details(customer_id):
         return jsonify({"error": str(e)}), 500
 
 # =====================================================
-# BASIC ENDPOINTS FOR FORMS
+# BASIC ENDPOINTS
 # =====================================================
 @app.route("/api/vehicles", methods=["GET"])
 def list_vehicles():
@@ -270,7 +275,7 @@ def send_insurance_test(email):
     return jsonify({"message": "Email sent"}), 200
 
 # =====================================================
-# RUN SERVER
+# RUN SERVER (LOCAL ONLY)
 # =====================================================
 if __name__ == "__main__":
     app.run(
