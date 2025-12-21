@@ -12,7 +12,6 @@ import {
 
 import { API_BASE_URL } from "../config";
 
-
 export default function VehicleDashboard() {
   const [summary, setSummary] = useState(null);
   const [inventory, setInventory] = useState(null);
@@ -26,43 +25,44 @@ export default function VehicleDashboard() {
   }, []);
 
   const loadDashboard = async () => {
+    // ✅ Health check
     try {
-      await axios.get(`${API}/api/health`);
+      await axios.get(`${API_BASE_URL}/api/health`);
     } catch {
       setError("Backend not reachable");
       return;
     }
 
     try {
-      const res = await axios.get(`${API}/api/dashboard/summary`);
+      const res = await axios.get(`${API_BASE_URL}/api/dashboard/summary`);
       setSummary(res.data);
     } catch {
       setSummary({});
     }
 
     try {
-      const res = await axios.get(`${API}/api/dashboard/inventory`);
+      const res = await axios.get(`${API_BASE_URL}/api/dashboard/inventory`);
       setInventory(res.data);
     } catch {
       setInventory({});
     }
 
     try {
-      const res = await axios.get(`${API}/api/dashboard/bookings`);
+      const res = await axios.get(`${API_BASE_URL}/api/dashboard/bookings`);
       setBookings(res.data);
     } catch {
       setBookings({});
     }
 
     try {
-      const res = await axios.get(`${API}/api/dashboard/service-status`);
+      const res = await axios.get(`${API_BASE_URL}/api/dashboard/service-status`);
       setServiceStatus(res.data);
     } catch {
       setServiceStatus({});
     }
 
     try {
-      const res = await axios.get(`${API}/api/dashboard/alerts`);
+      const res = await axios.get(`${API_BASE_URL}/api/dashboard/alerts`);
       setAlerts(res.data);
     } catch {
       setAlerts({});
