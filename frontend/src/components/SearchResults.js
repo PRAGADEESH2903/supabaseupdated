@@ -10,8 +10,8 @@ import {
   Chip,
 } from "@mui/material";
 
-export const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "https://supabaseupdated.onrender.com";
+import { API_BASE_URL } from "../config";
+
 
 
 const SearchResults = () => {
