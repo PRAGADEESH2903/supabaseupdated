@@ -1,5 +1,3 @@
-from flask import Flask
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -11,6 +9,7 @@ from supabase import Client
 
 from supabase_client import get_backend_port, get_supabase_client
 from email_utils import send_email
+
 
 # =====================================================
 # APP INIT
