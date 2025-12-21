@@ -46,9 +46,13 @@ def parse_date(value: Optional[str]) -> Optional[str]:
 # =====================================================
 # HEALTH CHECK
 # =====================================================
-@app.route("/api/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"}), 200
+@app.route("/", methods=["GET"])
+def health_check():
+    return {
+        "status": "ok",
+        "message": "Showroom backend is running"
+    }
+
 
 # =====================================================
 # CUSTOMERS (FIXES "Failed to load customers")
