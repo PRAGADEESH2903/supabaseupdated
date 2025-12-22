@@ -1,8 +1,7 @@
-// ServiceDetails.js
-import React, { useState, useEffect } from 'react';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import {
   Box,
   Paper,
@@ -15,114 +14,99 @@ import {
   Alert,
   Autocomplete,
   Chip,
-} from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-
+} from "@mui/material";
 import { API_BASE_URL } from "../config";
-axios.get(`${API_BASE_URL}/api/health`);
 
-
-
+/* ================= VALIDATION ================= */
 const validationSchema = Yup.object({
-  vehicle_id: Yup.number()
-    .typeError('Vehicle is required')
-    .required('Vehicle is required'),
+  vehicle_id: Yup.number().required("Vehicle is required"),
   service_count: Yup.number()
-    .typeError('Service count is required')
-    .required('Service count is required')
-    .min(1, 'Service count must be at least 1'),
-  status: Yup.string().required('Status is required'),
-  date: Yup.string().required('Service date is required'),
+    .required("Service count required")
+    .min(1, "Minimum 1"),
+  status: Yup.string().required("Status required"),
+  date: Yup.string().required("Date required"),
 });
 
 const ServiceDetails = () => {
-  const navigate = useNavigate();
-  const [error, setError] = useState(null);
   const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-  // ================= FETCH VEHICLES =================
+  /* ===== FETCH VEHICLES ===== */
   useEffect(() => {
-    const fetchVehicles = async () => {
-      try {
-        setLoading(true);
-        const res = await axios.get(`${API_BASE_URL}/api/vehicles`);
-        setVehicles(res.data || []);
-      } catch (err) {
-        setError('Failed to fetch vehicles');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVehicles();
+    axios
+      .get(`${API_BASE_URL}/api/vehicles`)
+      .then((res) => setVehicles(res.data))
+      .catch(() => setError("Failed to load vehicles"));
   }, []);
 
-  // ================= FORMIK =================
   const formik = useFormik({
     initialValues: {
-      vehicle_id: null,
-      service_count: '',
-      status: 'Pending',
-      date: new Date().toISOString().split('T')[0],
-      remarks: '',
+      vehicle_id: "",
+      service_count: "",
+      status: "Pending",
+      date: new Date().toISOString().split("T")[0],
+      remarks: "",
     },
     validationSchema,
     onSubmit: async (values, { resetForm }) => {
       try {
         setError(null);
+        setSuccess(false);
 
-        await axios.post(`${API_BASE_URL}/api/services`, {
+        const payload = {
           vehicle_id: Number(values.vehicle_id),
           service_count: Number(values.service_count),
-          status: values.status, // Capitalized
+          status: values.status,
           date: values.date,
           remarks: values.remarks,
-        });
+        };
 
+        console.log("Submitting service:", payload);
+
+        await axios.post(`${API_BASE_URL}/api/services`, payload);
+
+        setSuccess(true);
         resetForm();
-        navigate('/dealers');
       } catch (err) {
+        console.error(err);
         setError(
-          err.response?.data?.error || 'Failed to submit service details'
+          err.response?.data?.error || "Failed to submit service"
         );
       }
     },
   });
 
+  const serviceType =
+    Number(formik.values.service_count) <= 6 ? "FREE" : "PAID";
+
   return (
     <Container maxWidth="md">
       <Box sx={{ mt: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
+        <Paper sx={{ p: 4 }}>
           <Typography variant="h4" gutterBottom>
             Service Details
           </Typography>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
+          {error && <Alert severity="error">{error}</Alert>}
+          {success && (
+            <Alert severity="success">Service added successfully</Alert>
           )}
 
           <form onSubmit={formik.handleSubmit}>
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
+
               {/* VEHICLE */}
               <Grid item xs={12}>
                 <Autocomplete
                   options={vehicles}
-                  loading={loading}
-                  getOptionLabel={(option) =>
-                    `${option.name} - ${option.model}`
+                  getOptionLabel={(v) =>
+                    `${v.name} - ${v.model}`
                   }
-                  value={
-                    vehicles.find(
-                      (v) => v.id === formik.values.vehicle_id
-                    ) || null
-                  }
-                  onChange={(e, newValue) =>
+                  onChange={(_, value) =>
                     formik.setFieldValue(
-                      'vehicle_id',
-                      newValue ? newValue.id : null
+                      "vehicle_id",
+                      value ? value.id : ""
                     )
                   }
                   renderInput={(params) => (
@@ -146,11 +130,9 @@ const ServiceDetails = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Service Count"
-                  name="service_count"
                   type="number"
-                  value={formik.values.service_count}
-                  onChange={formik.handleChange}
+                  label="Service Count"
+                  {...formik.getFieldProps("service_count")}
                   error={
                     formik.touched.service_count &&
                     Boolean(formik.errors.service_count)
@@ -165,45 +147,32 @@ const ServiceDetails = () => {
               {/* STATUS */}
               <Grid item xs={12} sm={6}>
                 <TextField
-                  fullWidth
                   select
+                  fullWidth
                   label="Status"
-                  name="status"
-                  value={formik.values.status}
-                  onChange={formik.handleChange}
+                  {...formik.getFieldProps("status")}
                 >
                   <MenuItem value="Pending">Pending</MenuItem>
                   <MenuItem value="Completed">Completed</MenuItem>
-                  <MenuItem value="Cancelled">Cancelled</MenuItem>
                 </TextField>
               </Grid>
 
-              {/* SERVICE DATE */}
+              {/* DATE */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   type="date"
                   label="Service Date"
-                  name="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formik.values.date}
-                  onChange={formik.handleChange}
+                  {...formik.getFieldProps("date")}
                 />
               </Grid>
 
               {/* SERVICE TYPE DISPLAY */}
               <Grid item xs={12}>
                 <Chip
-                  label={
-                    Number(formik.values.service_count) <= 6
-                      ? 'FREE SERVICE'
-                      : 'PAID SERVICE'
-                  }
-                  color={
-                    Number(formik.values.service_count) <= 6
-                      ? 'success'
-                      : 'warning'
-                  }
+                  label={`${serviceType} SERVICE`}
+                  color={serviceType === "FREE" ? "success" : "warning"}
                 />
               </Grid>
 
@@ -212,25 +181,22 @@ const ServiceDetails = () => {
                 <TextField
                   fullWidth
                   label="Remarks"
-                  name="remarks"
-                  multiline
-                  rows={2}
-                  value={formik.values.remarks}
-                  onChange={formik.handleChange}
+                  {...formik.getFieldProps("remarks")}
                 />
               </Grid>
-            </Grid>
 
-            <Box sx={{ mt: 3 }}>
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                disabled={formik.isSubmitting}
-              >
-                Submit & Continue
-              </Button>
-            </Box>
+              <Grid item xs={12}>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  disabled={formik.isSubmitting}
+                >
+                  Submit Service
+                </Button>
+              </Grid>
+
+            </Grid>
           </form>
         </Paper>
       </Box>
