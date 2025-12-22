@@ -13,43 +13,32 @@ import {
   Alert,
   Autocomplete,
 } from "@mui/material";
-
 import { API_BASE_URL } from "../config";
-axios.get(`${API_BASE_URL}/api/health`);
-
 
 /* ================= VALIDATION ================= */
-const eightDigitField = Yup.string()
+const eightDigit = Yup.string()
   .matches(/^\d{8}$/, "Must be exactly 8 digits")
   .required("Required");
 
 const validationSchema = Yup.object({
-  customer: Yup.object().required("Customer is required"),
-  name: Yup.string().required("Vehicle name is required"),
-  model: Yup.string().required("Model is required"),
+  customer_id: Yup.number().required("Customer is required"),
+  name: Yup.string().required("Vehicle name required"),
+  model: Yup.string().required("Model required"),
   year: Yup.number()
-    .required("Year is required")
-    .min(1900, "Invalid year")
-    .max(new Date().getFullYear(), "Future year not allowed"),
-
-  engine_no: eightDigitField,
-  chassis_no: eightDigitField,
-  gearbox_no: eightDigitField,
-  battery_no: eightDigitField,
-  tire_front: eightDigitField,
-  tire_rear_left: eightDigitField,
-  tire_rear_right: eightDigitField,
-  tire_stepney: eightDigitField,
-
-  price: Yup.number().required("Price is required").min(0),
+    .required("Year required")
+    .min(1900)
+    .max(new Date().getFullYear()),
+  engine_no: eightDigit,
+  price: Yup.number().required("Price required").min(0),
 });
 
+/* ================= COMPONENT ================= */
 const VehicleInfo = () => {
   const [customers, setCustomers] = useState([]);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-  /* ================= FETCH CUSTOMERS ================= */
+  /* ===== FETCH CUSTOMERS ===== */
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/customers`)
@@ -59,7 +48,7 @@ const VehicleInfo = () => {
 
   const formik = useFormik({
     initialValues: {
-      customer: null,
+      customer_id: "",
       name: "",
       model: "",
       year: "",
@@ -80,41 +69,30 @@ const VehicleInfo = () => {
         setSuccess(false);
 
         const payload = {
-          name: values.name,
-          model: values.model,
+          ...values,
           year: Number(values.year),
-          engine_no: values.engine_no,
-          chassis_no: values.chassis_no,
-          gearbox_no: values.gearbox_no,
-          battery_no: values.battery_no,
-          tire_front: values.tire_front,
-          tire_rear_left: values.tire_rear_left,
-          tire_rear_right: values.tire_rear_right,
-          tire_stepney: values.tire_stepney,
           price: Number(values.price),
-          customer_id: values.customer.id, // ✅ auto-mapped
+          customer_id: Number(values.customer_id),
         };
 
+        console.log("Submitting vehicle:", payload);
+
         await axios.post(`${API_BASE_URL}/api/vehicles`, payload);
+
         setSuccess(true);
         resetForm();
-      } catch {
-        setError("Failed to submit vehicle details");
+      } catch (err) {
+        console.error(err);
+        setError(
+          err.response?.data?.error || "Failed to submit vehicle"
+        );
       }
     },
   });
 
-  /* ================= REUSABLE INPUT PROPS ================= */
-  const eightDigitInputProps = {
-    inputMode: "numeric",
-    pattern: "[0-9]*",
-    maxLength: 8,
-    placeholder: "Enter 8-digit number",
-  };
-
   return (
     <Container maxWidth="md">
-      <Box sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ mt: 4 }}>
         <Paper sx={{ p: 4 }}>
           <Typography variant="h4" gutterBottom>
             Vehicle Information
@@ -122,47 +100,44 @@ const VehicleInfo = () => {
 
           {error && <Alert severity="error">{error}</Alert>}
           {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Vehicle added successfully
-            </Alert>
+            <Alert severity="success">Vehicle added successfully</Alert>
           )}
 
           <form onSubmit={formik.handleSubmit}>
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
 
-              {/* ================= CUSTOMER ================= */}
+              {/* CUSTOMER */}
               <Grid item xs={12}>
                 <Autocomplete
                   options={customers}
-                  getOptionLabel={(o) =>
-                    `${o.name} - ${o.email || "No Email"}`
-                  }
-                  value={formik.values.customer}
+                  getOptionLabel={(c) => `${c.name} - ${c.contact}`}
                   onChange={(_, value) =>
-                    formik.setFieldValue("customer", value)
+                    formik.setFieldValue(
+                      "customer_id",
+                      value ? value.id : ""
+                    )
                   }
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="Select Customer"
                       error={
-                        formik.touched.customer &&
-                        Boolean(formik.errors.customer)
+                        formik.touched.customer_id &&
+                        Boolean(formik.errors.customer_id)
                       }
                       helperText={
-                        formik.touched.customer &&
-                        formik.errors.customer
+                        formik.touched.customer_id &&
+                        formik.errors.customer_id
                       }
                     />
                   )}
                 />
               </Grid>
 
-              {/* ================= BASIC INFO ================= */}
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Vehicle Name"
                   fullWidth
+                  label="Vehicle Name"
                   {...formik.getFieldProps("name")}
                   error={formik.touched.name && Boolean(formik.errors.name)}
                   helperText={formik.touched.name && formik.errors.name}
@@ -171,8 +146,8 @@ const VehicleInfo = () => {
 
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Model"
                   fullWidth
+                  label="Model"
                   {...formik.getFieldProps("model")}
                   error={formik.touched.model && Boolean(formik.errors.model)}
                   helperText={formik.touched.model && formik.errors.model}
@@ -181,60 +156,55 @@ const VehicleInfo = () => {
 
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Manufacture Year"
-                  type="number"
                   fullWidth
+                  type="number"
+                  label="Manufacture Year"
                   {...formik.getFieldProps("year")}
                   error={formik.touched.year && Boolean(formik.errors.year)}
                   helperText={formik.touched.year && formik.errors.year}
                 />
               </Grid>
 
-              {/* ================= 8-DIGIT FIELDS ================= */}
-              {[
-                { key: "engine_no", label: "Engine Number" },
-                { key: "chassis_no", label: "Chassis Number" },
-                { key: "gearbox_no", label: "Gearbox Number" },
-                { key: "battery_no", label: "Battery Number" },
-                { key: "tire_front", label: "Front Tire Number" },
-                { key: "tire_rear_left", label: "Rear Left Tire Number" },
-                { key: "tire_rear_right", label: "Rear Right Tire Number" },
-                { key: "tire_stepney", label: "Stepney Tire Number" },
-              ].map(({ key, label }) => (
-                <Grid item xs={12} sm={6} key={key}>
-                  <TextField
-                    label={label}
-                    fullWidth
-                    {...eightDigitInputProps}
-                    {...formik.getFieldProps(key)}
-                    error={
-                      formik.touched[key] &&
-                      Boolean(formik.errors[key])
-                    }
-                    helperText={
-                      formik.touched[key] && formik.errors[key]
-                    }
-                  />
-                </Grid>
-              ))}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Engine No"
+                  inputProps={{ maxLength: 8 }}
+                  {...formik.getFieldProps("engine_no")}
+                  error={
+                    formik.touched.engine_no &&
+                    Boolean(formik.errors.engine_no)
+                  }
+                  helperText={
+                    formik.touched.engine_no &&
+                    formik.errors.engine_no
+                  }
+                />
+              </Grid>
 
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Price"
-                  type="number"
                   fullWidth
+                  type="number"
+                  label="Price"
                   {...formik.getFieldProps("price")}
                   error={formik.touched.price && Boolean(formik.errors.price)}
                   helperText={formik.touched.price && formik.errors.price}
                 />
               </Grid>
-            </Grid>
 
-            <Box sx={{ mt: 4 }}>
-              <Button type="submit" variant="contained" fullWidth>
-                Submit Vehicle
-              </Button>
-            </Box>
+              <Grid item xs={12}>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  disabled={formik.isSubmitting}
+                >
+                  Submit Vehicle
+                </Button>
+              </Grid>
+
+            </Grid>
           </form>
         </Paper>
       </Box>
