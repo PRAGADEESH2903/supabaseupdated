@@ -14,16 +14,7 @@ from email_utils import send_email
 # APP INIT
 # =====================================================
 app = Flask(__name__)
-CORS(
-    app,
-    resources={
-        r"/api/*": {
-            "origins": ["*"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-        }
-    },
-)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # =====================================================
 # TABLE NAMES
@@ -54,12 +45,8 @@ def parse_date(value: Optional[str]) -> Optional[str]:
 # =====================================================
 # HEALTH
 # =====================================================
-@app.route("/", methods=["GET"])
-def root():
-    return jsonify({"status": "ok", "message": "Showroom backend running"})
-
 @app.route("/api/health", methods=["GET"])
-def api_health():
+def health():
     return jsonify({"status": "ok"})
 
 # =====================================================
@@ -67,27 +54,31 @@ def api_health():
 # =====================================================
 @app.route("/api/customers", methods=["GET"])
 def list_customers():
-    return jsonify(execute(sb().table(TABLE_CUSTOMERS).select("*")))
+    return jsonify(
+        execute(
+            sb().table(TABLE_CUSTOMERS)
+            .select("id,name,contact,email,address,city")
+        )
+    )
 
 @app.route("/api/customers", methods=["POST"])
 def create_customer():
-    payload = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
 
-    required = ["name", "contact_no", "email", "address", "city"]
+    required = ["name", "contact", "email", "address", "city"]
     for r in required:
-        if not payload.get(r):
+        if not data.get(r):
             return jsonify({"error": f"{r} is required"}), 400
 
     execute(
         sb().table(TABLE_CUSTOMERS).insert({
-            "name": payload["name"],
-            "contact": payload["contact_no"],
-            "email": payload["email"],
-            "address": payload["address"],
-            "city": payload["city"],
+            "name": data["name"],
+            "contact": data["contact"],
+            "email": data["email"],
+            "address": data["address"],
+            "city": data["city"],
         })
     )
-
     return jsonify({"message": "Customer created"}), 201
 
 # =====================================================
@@ -95,15 +86,32 @@ def create_customer():
 # =====================================================
 @app.route("/api/vehicles", methods=["GET"])
 def list_vehicles():
-    return jsonify(execute(sb().table(TABLE_VEHICLES).select("*")))
+    return jsonify(
+        execute(
+            sb().table(TABLE_VEHICLES)
+            .select("id,name,model")
+        )
+    )
 
 @app.route("/api/vehicles", methods=["POST"])
 def create_vehicle():
-    payload = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
 
-    payload["customer_id"] = int(payload["customer_id"])
-    payload["year"] = int(payload["year"])
-    payload["price"] = float(payload["price"])
+    payload = {
+        "name": data["name"],
+        "model": data["model"],
+        "year": int(data["year"]),
+        "engine_no": data["engine_no"],
+        "chassis_no": data["chassis_no"],
+        "gearbox_no": data["gearbox_no"],
+        "battery_no": data["battery_no"],
+        "tire_front": data["tire_front"],
+        "tire_rear_left": data["tire_rear_left"],
+        "tire_rear_right": data["tire_rear_right"],
+        "tire_stepney": data["tire_stepney"],
+        "price": float(data["price"]),
+        "customer_id": int(data["customer_id"]),
+    }
 
     execute(sb().table(TABLE_VEHICLES).insert(payload))
     return jsonify({"message": "Vehicle added"}), 201
@@ -113,58 +121,40 @@ def create_vehicle():
 # =====================================================
 @app.route("/api/sub-dealers", methods=["GET"])
 def list_sub_dealers():
-    return jsonify(execute(sb().table(TABLE_SUB_DEALERS).select("*")))
-
-@app.route("/api/sub-dealers", methods=["POST"])
-def create_sub_dealer():
-    payload = request.get_json(silent=True) or {}
-
-    required = ["dealer_code", "name", "contact", "location"]
-    for r in required:
-        if not payload.get(r):
-            return jsonify({"error": f"{r} is required"}), 400
-
-    execute(
-        sb().table(TABLE_SUB_DEALERS).insert({
-            "dealer_code": payload["dealer_code"],
-            "name": payload["name"],
-            "contact": payload["contact"],
-            "location": payload["location"],
-        })
+    return jsonify(
+        execute(
+            sb().table(TABLE_SUB_DEALERS)
+            .select("id,name")
+        )
     )
 
-    return jsonify({"message": "Sub dealer added"}), 201
-
 # =====================================================
-# PURCHASES (FIXED)
+# PURCHASES
 # =====================================================
 @app.route("/api/purchases", methods=["POST"])
 def create_purchase():
-    try:
-        payload = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
 
-        payload["vehicle_id"] = int(payload["vehicle_id"])
-        payload["purchase_date"] = parse_date(payload.get("purchase_date"))
-        payload["delivery_date"] = parse_date(payload.get("delivery_date"))
+    payload = {
+        "vehicle_id": int(data["vehicle_id"]),
+        "payment_method": data["payment_method"],
+        "owner_name": data["owner_name"],
+        "delivery_address": data["delivery_address"],
+        "purchase_date": parse_date(data.get("purchase_date")),
+        "delivery_date": parse_date(data.get("delivery_date")),
+        "insurance_start": parse_date(data.get("insurance_start")),
+        "insurance_end": parse_date(data.get("insurance_end")),
+        "dealer_id": int(data["dealer_id"]) if data.get("dealer_id") else None,
+        "bank_name": data.get("bank_name"),
+        "loan_amount": data.get("loan_amount"),
+        "loan_tenure": data.get("loan_tenure"),
+        "interest_rate": data.get("interest_rate"),
+        "emi_amount": data.get("emi_amount"),
+        "down_payment": data.get("down_payment"),
+    }
 
-        if payload["payment_method"] == "loan":
-            payload["insurance_start"] = parse_date(payload.get("insurance_start"))
-            payload["insurance_end"] = parse_date(payload.get("insurance_end"))
-        else:
-            payload["insurance_start"] = payload["purchase_date"]
-            payload["insurance_end"] = payload["purchase_date"]
-
-        if payload.get("dealer_id"):
-            payload["dealer_id"] = int(payload["dealer_id"])
-        else:
-            payload.pop("dealer_id", None)
-
-        execute(sb().table(TABLE_PURCHASES).insert(payload))
-        return jsonify({"message": "Purchase created"}), 201
-
-    except Exception as e:
-        print("PURCHASE ERROR:", e)
-        return jsonify({"error": str(e)}), 500
+    execute(sb().table(TABLE_PURCHASES).insert(payload))
+    return jsonify({"message": "Purchase created"}), 201
 
 # =====================================================
 # SERVICES
@@ -175,10 +165,15 @@ def list_services():
 
 @app.route("/api/services", methods=["POST"])
 def create_service():
-    payload = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
 
-    payload["vehicle_id"] = int(payload["vehicle_id"])
-    payload["service_count"] = int(payload["service_count"])
+    payload = {
+        "vehicle_id": int(data["vehicle_id"]),
+        "service_count": int(data["service_count"]),
+        "status": data.get("status", "Pending"),
+        "service_date": parse_date(data.get("service_date")),
+        "remarks": data.get("remarks"),
+    }
 
     execute(sb().table(TABLE_SERVICES).insert(payload))
     return jsonify({"message": "Service added"}), 201
@@ -190,43 +185,27 @@ def create_service():
 def customer_full_details(customer_id):
     customers = execute(
         sb().table(TABLE_CUSTOMERS)
-        .select("id, name, contact, email")
+        .select("id,name,contact,email")
         .eq("id", customer_id)
     )
 
     if not customers:
         return jsonify({"error": "Customer not found"}), 404
 
-    customer = customers[0]
-
-    purchases = execute(
-        sb().table(TABLE_PURCHASES)
-        .select("vehicle_id")
-        .eq("owner_name", customer["name"])
+    vehicles = execute(
+        sb().table(TABLE_VEHICLES)
+        .select("*")
+        .eq("customer_id", customer_id)
     )
 
-    vehicle_ids = [p["vehicle_id"] for p in purchases if p.get("vehicle_id")]
-
-    vehicles = []
-    if vehicle_ids:
-        vehicles = execute(
-            sb().table(TABLE_VEHICLES)
+    for v in vehicles:
+        v["services"] = execute(
+            sb().table(TABLE_SERVICES)
             .select("*")
-            .in_("id", vehicle_ids)
+            .eq("vehicle_id", v["id"])
         )
 
-        for v in vehicles:
-            services = execute(
-                sb().table(TABLE_SERVICES)
-                .select("*")
-                .eq("vehicle_id", v["id"])
-            )
-            v["services"] = services
-
-    return jsonify({
-        "customer": customer,
-        "vehicles": vehicles,
-    })
+    return jsonify({"customer": customers[0], "vehicles": vehicles})
 
 # =====================================================
 # DASHBOARD
@@ -269,8 +248,8 @@ def dashboard_bookings():
 @app.route("/api/dashboard/service-status", methods=["GET"])
 def dashboard_service_status():
     services = execute(sb().table(TABLE_SERVICES).select("status"))
-
     result = {"Pending": 0, "In Progress": 0, "Completed": 0}
+
     for s in services:
         status = s.get("status") or "Pending"
         if status not in result:
@@ -302,22 +281,22 @@ def global_search():
     if len(q) < 2:
         return jsonify({"customers": [], "vehicles": [], "dealers": []})
 
-    customers = execute(
-        sb().table(TABLE_CUSTOMERS).select("id, name").ilike("name", f"%{q}%")
-    )
-    vehicles = execute(
-        sb().table(TABLE_VEHICLES)
-        .select("id, name, model")
-        .or_(f"name.ilike.%{q}%,model.ilike.%{q}%")
-    )
-    dealers = execute(
-        sb().table(TABLE_SUB_DEALERS).select("id, name").ilike("name", f"%{q}%")
-    )
-
     return jsonify({
-        "customers": customers,
-        "vehicles": vehicles,
-        "dealers": dealers,
+        "customers": execute(
+            sb().table(TABLE_CUSTOMERS)
+            .select("id,name")
+            .ilike("name", f"%{q}%")
+        ),
+        "vehicles": execute(
+            sb().table(TABLE_VEHICLES)
+            .select("id,name,model")
+            .or_(f"name.ilike.%{q}%,model.ilike.%{q}%")
+        ),
+        "dealers": execute(
+            sb().table(TABLE_SUB_DEALERS)
+            .select("id,name")
+            .ilike("name", f"%{q}%")
+        ),
     })
 
 # =====================================================
@@ -331,6 +310,14 @@ def send_insurance_test(email):
         "Your vehicle insurance will expire soon."
     )
     return jsonify({"message": "Email sent"})
+
+# =====================================================
+# ERROR HANDLER
+# =====================================================
+@app.errorhandler(Exception)
+def handle_error(e):
+    print("SERVER ERROR:", e)
+    return jsonify({"error": str(e)}), 500
 
 # =====================================================
 # RUN
