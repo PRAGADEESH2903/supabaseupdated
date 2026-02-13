@@ -32,33 +32,48 @@ TABLE_SUB_DEALERS = "sub_dealers"
 def sb() -> Client:
     return get_supabase_client()
 
-def execute(q):
-    res = q.execute()
-    if getattr(res, "error", None):
-        raise RuntimeError(res.error.message)
-    return res.data or []
+def execute(query):
+    """
+    Safe execution wrapper for Supabase queries
+    """
+    try:
+        response = query.execute()
+
+        # Handle newer supabase response format
+        if hasattr(response, "error") and response.error:
+            raise Exception(response.error.message)
+
+        return response.data or []
+
+    except Exception as e:
+        print("SUPABASE ERROR:", str(e))
+        raise Exception(str(e))
+
 
 def parse_date(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     try:
         return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
-    except:
+    except Exception:
         return None
 
+
 # =====================================================
-# ROOT (IMPORTANT FOR RENDER)
+# ROOT
 # =====================================================
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return jsonify({"message": "Showroom API is live"})
 
+
 # =====================================================
-# HEALTH CHECK
+# HEALTH
 # =====================================================
-@app.route("/api/health", methods=["GET"])
+@app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
+
 
 # =====================================================
 # CUSTOMERS
@@ -72,26 +87,19 @@ def list_customers():
         )
     )
 
+
 @app.route("/api/customers", methods=["POST"])
 def create_customer():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json() or {}
 
     required = ["name", "contact", "email", "address", "city"]
-    for r in required:
-        if not data.get(r):
-            return jsonify({"error": f"{r} is required"}), 400
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
 
-    execute(
-        sb().table(TABLE_CUSTOMERS).insert({
-            "name": data["name"],
-            "contact": data["contact"],
-            "email": data["email"],
-            "address": data["address"],
-            "city": data["city"],
-        })
-    )
-
+    execute(sb().table(TABLE_CUSTOMERS).insert(data))
     return jsonify({"message": "Customer created"}), 201
+
 
 # =====================================================
 # VEHICLES
@@ -105,14 +113,15 @@ def list_vehicles():
         )
     )
 
+
 @app.route("/api/vehicles", methods=["POST"])
 def create_vehicle():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json() or {}
 
     required = ["name", "model", "year", "engine_no", "price", "customer_id"]
-    for r in required:
-        if not data.get(r):
-            return jsonify({"error": f"{r} is required"}), 400
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
 
     payload = {
         "name": data["name"],
@@ -133,6 +142,7 @@ def create_vehicle():
     execute(sb().table(TABLE_VEHICLES).insert(payload))
     return jsonify({"message": "Vehicle added"}), 201
 
+
 # =====================================================
 # SUB DEALERS
 # =====================================================
@@ -145,17 +155,18 @@ def list_sub_dealers():
         )
     )
 
+
 # =====================================================
 # PURCHASES
 # =====================================================
 @app.route("/api/purchases", methods=["POST"])
 def create_purchase():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json() or {}
 
     required = ["vehicle_id", "payment_method", "owner_name"]
-    for r in required:
-        if not data.get(r):
-            return jsonify({"error": f"{r} is required"}), 400
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
 
     payload = {
         "vehicle_id": int(data["vehicle_id"]),
@@ -178,6 +189,7 @@ def create_purchase():
     execute(sb().table(TABLE_PURCHASES).insert(payload))
     return jsonify({"message": "Purchase created"}), 201
 
+
 # =====================================================
 # SERVICES
 # =====================================================
@@ -189,14 +201,15 @@ def list_services():
         )
     )
 
+
 @app.route("/api/services", methods=["POST"])
 def create_service():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json() or {}
 
     required = ["vehicle_id", "service_count"]
-    for r in required:
-        if not data.get(r):
-            return jsonify({"error": f"{r} is required"}), 400
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
 
     payload = {
         "vehicle_id": int(data["vehicle_id"]),
@@ -209,85 +222,18 @@ def create_service():
     execute(sb().table(TABLE_SERVICES).insert(payload))
     return jsonify({"message": "Service added"}), 201
 
-# =====================================================
-# CUSTOMER FULL DETAILS
-# =====================================================
-@app.route("/api/customers/<int:customer_id>/full-details", methods=["GET"])
-def customer_full_details(customer_id):
-    customers = execute(
-        sb().table(TABLE_CUSTOMERS)
-        .select("id,name,contact,email")
-        .eq("id", customer_id)
-    )
-
-    if not customers:
-        return jsonify({"error": "Customer not found"}), 404
-
-    vehicles = execute(
-        sb().table(TABLE_VEHICLES)
-        .select("*")
-        .eq("customer_id", customer_id)
-    )
-
-    for v in vehicles:
-        v["services"] = execute(
-            sb().table(TABLE_SERVICES)
-            .select("*")
-            .eq("vehicle_id", v["id"])
-        )
-
-    return jsonify({"customer": customers[0], "vehicles": vehicles})
 
 # =====================================================
-# SEARCH
-# =====================================================
-@app.route("/api/search", methods=["GET"])
-def global_search():
-    q = (request.args.get("q") or "").strip()
-
-    if len(q) < 2:
-        return jsonify({"customers": [], "vehicles": [], "dealers": []})
-
-    return jsonify({
-        "customers": execute(
-            sb().table(TABLE_CUSTOMERS)
-            .select("id,name")
-            .ilike("name", f"%{q}%")
-        ),
-        "vehicles": execute(
-            sb().table(TABLE_VEHICLES)
-            .select("id,name,model")
-            .or_(f"name.ilike.%{q}%,model.ilike.%{q}%")
-        ),
-        "dealers": execute(
-            sb().table(TABLE_SUB_DEALERS)
-            .select("id,name")
-            .ilike("name", f"%{q}%")
-        ),
-    })
-
-# =====================================================
-# EMAIL TEST
-# =====================================================
-@app.route("/api/send-insurance-test/<email>", methods=["GET"])
-def send_insurance_test(email):
-    send_email(
-        email,
-        "Insurance Expiry Reminder",
-        "Your vehicle insurance will expire soon."
-    )
-    return jsonify({"message": "Email sent"})
-
-# =====================================================
-# ERROR HANDLER (FIXED)
+# ERROR HANDLER
 # =====================================================
 @app.errorhandler(Exception)
 def handle_error(e):
     if isinstance(e, HTTPException):
         return jsonify({"error": e.description}), e.code
 
-    print("SERVER ERROR:", e)
-    return jsonify({"error": "Internal Server Error"}), 500
+    print("SERVER ERROR:", str(e))
+    return jsonify({"error": str(e)}), 500
+
 
 # =====================================================
 # RUN
