@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from flask import Flask, jsonify, request
@@ -14,7 +14,7 @@ from email_utils import send_email
 # APP INIT
 # =====================================================
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app)
 
 # =====================================================
 # TABLE NAMES
@@ -40,10 +40,13 @@ def execute(q):
 def parse_date(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except:
+        return None
 
 # =====================================================
-# HEALTH
+# HEALTH CHECK
 # =====================================================
 @app.route("/api/health", methods=["GET"])
 def health():
@@ -79,6 +82,7 @@ def create_customer():
             "city": data["city"],
         })
     )
+
     return jsonify({"message": "Customer created"}), 201
 
 # =====================================================
@@ -89,7 +93,7 @@ def list_vehicles():
     return jsonify(
         execute(
             sb().table(TABLE_VEHICLES)
-            .select("id,name,model")
+            .select("id,name,model,year,price,customer_id")
         )
     )
 
@@ -97,18 +101,23 @@ def list_vehicles():
 def create_vehicle():
     data = request.get_json(silent=True) or {}
 
+    required = ["name", "model", "year", "engine_no", "price", "customer_id"]
+    for r in required:
+        if not data.get(r):
+            return jsonify({"error": f"{r} is required"}), 400
+
     payload = {
         "name": data["name"],
         "model": data["model"],
         "year": int(data["year"]),
         "engine_no": data["engine_no"],
-        "chassis_no": data["chassis_no"],
-        "gearbox_no": data["gearbox_no"],
-        "battery_no": data["battery_no"],
-        "tire_front": data["tire_front"],
-        "tire_rear_left": data["tire_rear_left"],
-        "tire_rear_right": data["tire_rear_right"],
-        "tire_stepney": data["tire_stepney"],
+        "chassis_no": data.get("chassis_no"),
+        "gearbox_no": data.get("gearbox_no"),
+        "battery_no": data.get("battery_no"),
+        "tire_front": data.get("tire_front"),
+        "tire_rear_left": data.get("tire_rear_left"),
+        "tire_rear_right": data.get("tire_rear_right"),
+        "tire_stepney": data.get("tire_stepney"),
         "price": float(data["price"]),
         "customer_id": int(data["customer_id"]),
     }
@@ -135,11 +144,16 @@ def list_sub_dealers():
 def create_purchase():
     data = request.get_json(silent=True) or {}
 
+    required = ["vehicle_id", "payment_method", "owner_name"]
+    for r in required:
+        if not data.get(r):
+            return jsonify({"error": f"{r} is required"}), 400
+
     payload = {
         "vehicle_id": int(data["vehicle_id"]),
         "payment_method": data["payment_method"],
         "owner_name": data["owner_name"],
-        "delivery_address": data["delivery_address"],
+        "delivery_address": data.get("delivery_address"),
         "purchase_date": parse_date(data.get("purchase_date")),
         "delivery_date": parse_date(data.get("delivery_date")),
         "insurance_start": parse_date(data.get("insurance_start")),
@@ -161,11 +175,20 @@ def create_purchase():
 # =====================================================
 @app.route("/api/services", methods=["GET"])
 def list_services():
-    return jsonify(execute(sb().table(TABLE_SERVICES).select("*")))
+    return jsonify(
+        execute(
+            sb().table(TABLE_SERVICES).select("*")
+        )
+    )
 
 @app.route("/api/services", methods=["POST"])
 def create_service():
     data = request.get_json(silent=True) or {}
+
+    required = ["vehicle_id", "service_count"]
+    for r in required:
+        if not data.get(r):
+            return jsonify({"error": f"{r} is required"}), 400
 
     payload = {
         "vehicle_id": int(data["vehicle_id"]),
@@ -179,7 +202,7 @@ def create_service():
     return jsonify({"message": "Service added"}), 201
 
 # =====================================================
-# CUSTOMER → VEHICLE → SERVICE DETAILS
+# CUSTOMER FULL DETAILS
 # =====================================================
 @app.route("/api/customers/<int:customer_id>/full-details", methods=["GET"])
 def customer_full_details(customer_id):
@@ -206,70 +229,6 @@ def customer_full_details(customer_id):
         )
 
     return jsonify({"customer": customers[0], "vehicles": vehicles})
-
-# =====================================================
-# DASHBOARD
-# =====================================================
-@app.route("/api/dashboard/summary", methods=["GET"])
-def dashboard_summary():
-    purchases = execute(sb().table(TABLE_PURCHASES).select("id"))
-    services = execute(sb().table(TABLE_SERVICES).select("status"))
-    dealers = execute(sb().table(TABLE_SUB_DEALERS).select("id"))
-
-    return jsonify({
-        "totalVehiclesSold": len(purchases),
-        "totalRevenue": len(purchases),
-        "pendingDeliveries": 0,
-        "activeSubDealers": len(dealers),
-        "pendingMaintenance": sum(
-            1 for s in services if s.get("status") != "Completed"
-        ),
-    })
-
-@app.route("/api/dashboard/inventory", methods=["GET"])
-def dashboard_inventory():
-    vehicles = execute(sb().table(TABLE_VEHICLES).select("id"))
-    return jsonify({"totalVehiclesInStock": len(vehicles)})
-
-@app.route("/api/dashboard/bookings", methods=["GET"])
-def dashboard_bookings():
-    purchases = execute(sb().table(TABLE_PURCHASES).select("purchase_date"))
-    today = datetime.utcnow().date()
-
-    def within(days, d):
-        return d and datetime.fromisoformat(d).date() >= today - timedelta(days=days)
-
-    return jsonify({
-        "daily": sum(1 for p in purchases if p.get("purchase_date") == today.isoformat()),
-        "weekly": sum(1 for p in purchases if within(7, p.get("purchase_date"))),
-        "monthly": sum(1 for p in purchases if within(30, p.get("purchase_date"))),
-    })
-
-@app.route("/api/dashboard/service-status", methods=["GET"])
-def dashboard_service_status():
-    services = execute(sb().table(TABLE_SERVICES).select("status"))
-    result = {"Pending": 0, "In Progress": 0, "Completed": 0}
-
-    for s in services:
-        status = s.get("status") or "Pending"
-        if status not in result:
-            status = "Pending"
-        result[status] += 1
-
-    return jsonify(result)
-
-@app.route("/api/dashboard/alerts", methods=["GET"])
-def dashboard_alerts():
-    vehicles = execute(sb().table(TABLE_VEHICLES).select("created_at"))
-    threshold = datetime.utcnow() - timedelta(days=60)
-
-    unsold = sum(
-        1 for v in vehicles
-        if v.get("created_at") and
-        datetime.fromisoformat(v["created_at"].replace("Z", "")) < threshold
-    )
-
-    return jsonify({"unsoldOver60Days": unsold})
 
 # =====================================================
 # SEARCH
@@ -300,7 +259,7 @@ def global_search():
     })
 
 # =====================================================
-# EMAIL
+# EMAIL TEST
 # =====================================================
 @app.route("/api/send-insurance-test/<email>", methods=["GET"])
 def send_insurance_test(email):
@@ -326,5 +285,5 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=get_backend_port(),
-        debug=True,
+        debug=False
     )
