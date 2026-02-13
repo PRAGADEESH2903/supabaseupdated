@@ -12,34 +12,37 @@ import {
   Alert,
 } from "@mui/material";
 
-const API_BASE_URL = "http://localhost:5050";
+import { API_BASE_URL } from "../config";
 
 /* ================= VALIDATION ================= */
 const validationSchema = Yup.object({
-  vehicle_id: Yup.number().required("Vehicle required"),
-  payment_method: Yup.string().required(),
-  owner_name: Yup.string().required(),
-  delivery_address: Yup.string().required(),
-  delivery_date: Yup.string().required(),
-  purchase_date: Yup.string().required(),
+  vehicle_id: Yup.number().required("Vehicle is required"),
+  payment_method: Yup.string().required("Payment method required"),
+  owner_name: Yup.string().required("Owner name required"),
+  delivery_address: Yup.string().required("Delivery address required"),
+  delivery_date: Yup.string().required("Delivery date required"),
+  purchase_date: Yup.string().required("Purchase date required"),
   insurance_start: Yup.string().required("Insurance start required"),
   insurance_end: Yup.string().required("Insurance end required"),
 });
 
+/* ================= COMPONENT ================= */
 export default function PurchaseOptions() {
   const [vehicles, setVehicles] = useState([]);
   const [dealers, setDealers] = useState([]);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD VEHICLES & DEALERS ================= */
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/vehicles`)
-      .then(res => setVehicles(res.data))
+    axios
+      .get(`${API_BASE_URL}/api/vehicles`)
+      .then((res) => setVehicles(res.data))
       .catch(() => setError("Vehicle fetch failed"));
 
-    axios.get(`${API_BASE_URL}/api/sub-dealers`)
-      .then(res => setDealers(res.data))
+    axios
+      .get(`${API_BASE_URL}/api/sub-dealers`)
+      .then((res) => setDealers(res.data))
       .catch(() => setDealers([]));
   }, []);
 
@@ -56,7 +59,7 @@ export default function PurchaseOptions() {
       insurance_start: "",
       insurance_end: "",
 
-      // loan fields
+      // Loan fields
       bank_name: "",
       loan_amount: "",
       loan_tenure: "",
@@ -102,12 +105,12 @@ export default function PurchaseOptions() {
         resetForm();
       } catch (err) {
         console.error(err);
-        setError("Failed to submit purchase");
+        setError(err.response?.data?.error || "Failed to submit purchase");
       }
     },
   });
 
-  /* ================= EMI AUTO CALC ================= */
+  /* ================= EMI AUTO CALCULATION ================= */
   useEffect(() => {
     if (
       formik.values.payment_method === "loan" &&
@@ -118,18 +121,20 @@ export default function PurchaseOptions() {
       const P = Number(formik.values.loan_amount);
       const R = Number(formik.values.interest_rate) / 100 / 12;
       const N = Number(formik.values.loan_tenure) * 12;
-  
-      const emi = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1);
+
+      const emi =
+        (P * R * Math.pow(1 + R, N)) /
+        (Math.pow(1 + R, N) - 1);
+
       formik.setFieldValue("emi_amount", emi.toFixed(2));
     }
   }, [
-    formik, // ✅ FIX
     formik.values.loan_amount,
     formik.values.loan_tenure,
     formik.values.interest_rate,
     formik.values.payment_method,
   ]);
-  
+
   /* ================= UI ================= */
   return (
     <Container maxWidth="sm">
@@ -140,51 +145,143 @@ export default function PurchaseOptions() {
         {success && <Alert severity="success">Purchase Saved</Alert>}
 
         <form onSubmit={formik.handleSubmit}>
-          <TextField select fullWidth label="Vehicle" {...formik.getFieldProps("vehicle_id")} sx={{ mt: 2 }}>
-            {vehicles.map(v => (
+          {/* Vehicle */}
+          <TextField
+            select
+            fullWidth
+            label="Vehicle"
+            {...formik.getFieldProps("vehicle_id")}
+            sx={{ mt: 2 }}
+          >
+            {vehicles.map((v) => (
               <MenuItem key={v.id} value={v.id}>
                 {v.name} - {v.model}
               </MenuItem>
             ))}
           </TextField>
 
-          <TextField select fullWidth label="Dealer (optional)" {...formik.getFieldProps("dealer_id")} sx={{ mt: 2 }}>
+          {/* Dealer */}
+          <TextField
+            select
+            fullWidth
+            label="Dealer (Optional)"
+            {...formik.getFieldProps("dealer_id")}
+            sx={{ mt: 2 }}
+          >
             <MenuItem value="">None</MenuItem>
-            {dealers.map(d => (
-              <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>
+            {dealers.map((d) => (
+              <MenuItem key={d.id} value={d.id}>
+                {d.name}
+              </MenuItem>
             ))}
           </TextField>
 
-          <TextField select fullWidth label="Payment" {...formik.getFieldProps("payment_method")} sx={{ mt: 2 }}>
+          {/* Payment */}
+          <TextField
+            select
+            fullWidth
+            label="Payment Method"
+            {...formik.getFieldProps("payment_method")}
+            sx={{ mt: 2 }}
+          >
             <MenuItem value="cash">Cash</MenuItem>
             <MenuItem value="loan">Loan</MenuItem>
           </TextField>
 
-          <TextField fullWidth label="Owner Name" {...formik.getFieldProps("owner_name")} sx={{ mt: 2 }} />
-          <TextField fullWidth label="Delivery Address" {...formik.getFieldProps("delivery_address")} sx={{ mt: 2 }} />
+          <TextField
+            fullWidth
+            label="Owner Name"
+            {...formik.getFieldProps("owner_name")}
+            sx={{ mt: 2 }}
+          />
 
-          <TextField type="date" fullWidth label="Delivery Date" InputLabelProps={{ shrink: true }}
-            {...formik.getFieldProps("delivery_date")} sx={{ mt: 2 }} />
+          <TextField
+            fullWidth
+            label="Delivery Address"
+            {...formik.getFieldProps("delivery_address")}
+            sx={{ mt: 2 }}
+          />
 
-          <TextField type="date" fullWidth label="Purchase Date" InputLabelProps={{ shrink: true }}
-            {...formik.getFieldProps("purchase_date")} sx={{ mt: 2 }} />
-
-          <TextField type="date" fullWidth label="Insurance Start"
+          <TextField
+            type="date"
+            fullWidth
+            label="Delivery Date"
             InputLabelProps={{ shrink: true }}
-            {...formik.getFieldProps("insurance_start")} sx={{ mt: 2 }} />
+            {...formik.getFieldProps("delivery_date")}
+            sx={{ mt: 2 }}
+          />
 
-          <TextField type="date" fullWidth label="Insurance End"
+          <TextField
+            type="date"
+            fullWidth
+            label="Purchase Date"
             InputLabelProps={{ shrink: true }}
-            {...formik.getFieldProps("insurance_end")} sx={{ mt: 2 }} />
+            {...formik.getFieldProps("purchase_date")}
+            sx={{ mt: 2 }}
+          />
 
+          <TextField
+            type="date"
+            fullWidth
+            label="Insurance Start"
+            InputLabelProps={{ shrink: true }}
+            {...formik.getFieldProps("insurance_start")}
+            sx={{ mt: 2 }}
+          />
+
+          <TextField
+            type="date"
+            fullWidth
+            label="Insurance End"
+            InputLabelProps={{ shrink: true }}
+            {...formik.getFieldProps("insurance_end")}
+            sx={{ mt: 2 }}
+          />
+
+          {/* Loan Fields */}
           {formik.values.payment_method === "loan" && (
             <>
-              <TextField fullWidth label="Bank Name" {...formik.getFieldProps("bank_name")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Loan Amount" type="number" {...formik.getFieldProps("loan_amount")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Loan Tenure (Years)" type="number" {...formik.getFieldProps("loan_tenure")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Interest Rate (%)" type="number" {...formik.getFieldProps("interest_rate")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="EMI Amount" disabled {...formik.getFieldProps("emi_amount")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Down Payment" type="number" {...formik.getFieldProps("down_payment")} sx={{ mt: 2 }} />
+              <TextField
+                fullWidth
+                label="Bank Name"
+                {...formik.getFieldProps("bank_name")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Loan Amount"
+                type="number"
+                {...formik.getFieldProps("loan_amount")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Loan Tenure (Years)"
+                type="number"
+                {...formik.getFieldProps("loan_tenure")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Interest Rate (%)"
+                type="number"
+                {...formik.getFieldProps("interest_rate")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="EMI Amount"
+                disabled
+                {...formik.getFieldProps("emi_amount")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Down Payment"
+                type="number"
+                {...formik.getFieldProps("down_payment")}
+                sx={{ mt: 2 }}
+              />
             </>
           )}
 
