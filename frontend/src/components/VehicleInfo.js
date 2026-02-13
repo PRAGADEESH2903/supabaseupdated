@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useFormik } from "formik";
 import * as Yup from "yup";
+import { useFormik } from "formik";
 import {
+  Container,
   Box,
   Paper,
   Typography,
+  Grid,
   TextField,
   Button,
-  Container,
-  Grid,
   Alert,
   Autocomplete,
 } from "@mui/material";
@@ -44,10 +44,10 @@ const validationSchema = Yup.object({
 
 const VehicleInfo = () => {
   const [customers, setCustomers] = useState([]);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-  /* ================= FETCH CUSTOMERS ================= */
+  /* ===== FETCH CUSTOMERS ===== */
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/customers`)
@@ -56,6 +56,7 @@ const VehicleInfo = () => {
   }, []);
 
   /* ================= FORM ================= */
+
   const formik = useFormik({
     initialValues: {
       customer: null,
@@ -95,6 +96,7 @@ const VehicleInfo = () => {
         };
 
         await axios.post(`${API_BASE_URL}/api/vehicles`, payload);
+
         setSuccess(true);
         resetForm();
       } catch (err) {
@@ -102,14 +104,6 @@ const VehicleInfo = () => {
       }
     },
   });
-
-  /* ================= COMMON INPUT PROPS ================= */
-  const eightDigitInputProps = {
-    inputMode: "numeric",
-    pattern: "[0-9]*",
-    maxLength: 8,
-    placeholder: "Enter 8-digit number",
-  };
 
   return (
     <Container maxWidth="md">
@@ -128,16 +122,14 @@ const VehicleInfo = () => {
 
           <form onSubmit={formik.handleSubmit}>
             <Grid container spacing={3}>
-
-              {/* ================= CUSTOMER ================= */}
+              {/* CUSTOMER */}
               <Grid item xs={12}>
                 <Autocomplete
                   options={customers}
                   getOptionLabel={(c) => `${c.name} - ${c.contact}`}
-                  value={formik.values.customer}
-                  onChange={(_, value) => {
-                    formik.setFieldValue("customer", value);
-                  }}
+                  onChange={(_, value) =>
+                    formik.setFieldValue("customer", value)
+                  }
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -147,98 +139,79 @@ const VehicleInfo = () => {
                         Boolean(formik.errors.customer)
                       }
                       helperText={
-                        formik.touched.customer &&
-                        formik.errors.customer
+                        formik.touched.customer && formik.errors.customer
                       }
                     />
                   )}
                 />
               </Grid>
 
-              {/* ================= BASIC INFO ================= */}
+              {/* BASIC INFO */}
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
                   label="Vehicle Name"
-                  fullWidth
                   {...formik.getFieldProps("name")}
-                  error={formik.touched.name && Boolean(formik.errors.name)}
-                  helperText={formik.touched.name && formik.errors.name}
+                  error={
+                    formik.touched.name && Boolean(formik.errors.name)
+                  }
+                  helperText={
+                    formik.touched.name && formik.errors.name
+                  }
                 />
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
                   label="Model"
-                  fullWidth
                   {...formik.getFieldProps("model")}
-                  error={formik.touched.model && Boolean(formik.errors.model)}
-                  helperText={formik.touched.model && formik.errors.model}
+                  error={
+                    formik.touched.model && Boolean(formik.errors.model)
+                  }
+                  helperText={
+                    formik.touched.model && formik.errors.model
+                  }
                 />
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
+                  type="number"
                   label="Manufacture Year"
-                  type="number"
-                  fullWidth
                   {...formik.getFieldProps("year")}
-                  error={formik.touched.year && Boolean(formik.errors.year)}
-                  helperText={formik.touched.year && formik.errors.year}
+                  error={
+                    formik.touched.year && Boolean(formik.errors.year)
+                  }
+                  helperText={
+                    formik.touched.year && formik.errors.year
+                  }
                 />
               </Grid>
 
-              {/* ================= 8 DIGIT FIELDS ================= */}
-              {[
-                { key: "engine_no", label: "Engine Number" },
-                { key: "chassis_no", label: "Chassis Number" },
-                { key: "gearbox_no", label: "Gearbox Number" },
-                { key: "battery_no", label: "Battery Number" },
-                { key: "tire_front", label: "Front Tire Number" },
-                { key: "tire_rear_left", label: "Rear Left Tire Number" },
-                { key: "tire_rear_right", label: "Rear Right Tire Number" },
-                { key: "tire_stepney", label: "Stepney Tire Number" },
-              ].map(({ key, label }) => (
-                <Grid item xs={12} sm={6} key={key}>
-                  <TextField
-                    label={label}
-                    fullWidth
-                    {...eightDigitInputProps}
-                    {...formik.getFieldProps(key)}
-                    error={
-                      formik.touched[key] &&
-                      Boolean(formik.errors[key])
-                    }
-                    helperText={
-                      formik.touched[key] && formik.errors[key]
-                    }
-                  />
-                </Grid>
-              ))}
-
-              {/* ================= PRICE ================= */}
+              {/* PRICE */}
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Price"
-                  type="number"
                   fullWidth
+                  type="number"
+                  label="Price"
                   {...formik.getFieldProps("price")}
-                  error={formik.touched.price && Boolean(formik.errors.price)}
-                  helperText={formik.touched.price && formik.errors.price}
+                  error={
+                    formik.touched.price && Boolean(formik.errors.price)
+                  }
+                  helperText={
+                    formik.touched.price && formik.errors.price
+                  }
                 />
               </Grid>
 
-              {/* ================= SUBMIT ================= */}
+              {/* SUBMIT */}
               <Grid item xs={12}>
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  disabled={formik.isSubmitting}
-                >
-                  Submit Vehicle
+                <Button variant="contained" type="submit" fullWidth>
+                  Add Vehicle
                 </Button>
               </Grid>
-
             </Grid>
           </form>
         </Paper>
