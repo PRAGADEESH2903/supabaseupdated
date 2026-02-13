@@ -6,6 +6,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import Client
+from werkzeug.exceptions import HTTPException
 
 from supabase_client import get_backend_port, get_supabase_client
 from email_utils import send_email
@@ -44,6 +45,13 @@ def parse_date(value: Optional[str]) -> Optional[str]:
         return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
     except:
         return None
+
+# =====================================================
+# ROOT (IMPORTANT FOR RENDER)
+# =====================================================
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"message": "Showroom API is live"})
 
 # =====================================================
 # HEALTH CHECK
@@ -271,12 +279,15 @@ def send_insurance_test(email):
     return jsonify({"message": "Email sent"})
 
 # =====================================================
-# ERROR HANDLER
+# ERROR HANDLER (FIXED)
 # =====================================================
 @app.errorhandler(Exception)
 def handle_error(e):
+    if isinstance(e, HTTPException):
+        return jsonify({"error": e.description}), e.code
+
     print("SERVER ERROR:", e)
-    return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Internal Server Error"}), 500
 
 # =====================================================
 # RUN
