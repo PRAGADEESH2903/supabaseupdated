@@ -5,7 +5,6 @@ import { ThemeProvider, CssBaseline, Box } from "@mui/material";
 import theme from "./theme";
 
 /* ---------------- COMPONENT IMPORTS ---------------- */
-import VehicleDashboard from "./components/VehicleDashboard";
 import CustomerInfo from "./components/CustomerInfo";
 import VehicleInfo from "./components/VehicleInfo";
 import SubDealerInfo from "./components/SubDealerInfo";
@@ -26,11 +25,8 @@ function App() {
 
         <Box sx={{ pt: 10, px: 2, pb: 6 }}>
           <Routes>
-            {/* Default → Dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-            {/* MAIN DASHBOARD */}
-            <Route path="/dashboard" element={<VehicleDashboard />} />
+            {/* Default → Customers */}
+            <Route path="/" element={<Navigate to="/customers" replace />} />
 
             {/* WORKFLOW PAGES */}
             <Route path="/customers" element={<CustomerInfo />} />
@@ -43,8 +39,8 @@ function App() {
             {/* SEARCH */}
             <Route path="/search" element={<SearchResults />} />
 
-            {/* FALLBACK → Dashboard */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* FALLBACK → Customers */}
+            <Route path="*" element={<Navigate to="/customers" replace />} />
           </Routes>
         </Box>
       </Router>
