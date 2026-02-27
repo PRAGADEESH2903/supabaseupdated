@@ -26,7 +26,7 @@ TABLE_PURCHASES = "purchases"
 TABLE_SUB_DEALERS = "sub_dealers"
 
 # =====================================================
-# SUPABASE HELPER FUNCTIONS
+# SUPABASE HELPERS
 # =====================================================
 def sb() -> Client:
     return get_supabase_client()
@@ -113,7 +113,7 @@ def vehicles():
         return jsonify(
             execute(
                 sb().table(TABLE_VEHICLES)
-                .select("id,name,model,year,price,customer_id")
+                .select("*")
             )
         )
 
@@ -147,14 +147,34 @@ def vehicles():
 # =====================================================
 # SUB DEALERS
 # =====================================================
-@app.route("/api/sub-dealers", methods=["GET"])
+@app.route("/api/sub-dealers", methods=["GET", "POST"])
 def sub_dealers():
-    return jsonify(
-        execute(
-            sb().table(TABLE_SUB_DEALERS)
-            .select("id,name")
+
+    if request.method == "GET":
+        return jsonify(
+            execute(
+                sb().table(TABLE_SUB_DEALERS)
+                .select("*")
+            )
         )
+
+    data = request.get_json() or {}
+
+    required = ["dealer_code", "name", "contact", "location"]
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
+
+    execute(
+        sb().table(TABLE_SUB_DEALERS).insert({
+            "dealer_code": data["dealer_code"],
+            "name": data["name"],
+            "contact": data["contact"],
+            "location": data["location"],
+        })
     )
+
+    return jsonify({"message": "Dealer added"}), 201
 
 
 # =====================================================
@@ -245,7 +265,63 @@ def services():
 
 
 # =====================================================
-# GLOBAL ERROR HANDLER
+# SEARCH
+# =====================================================
+@app.route("/api/search", methods=["GET"])
+def search():
+    query = request.args.get("q", "").strip()
+
+    if not query:
+        return jsonify({"customers": []})
+
+    customers = execute(
+        sb().table(TABLE_CUSTOMERS)
+        .select("id,name,contact,email")
+        .ilike("name", f"%{query}%")
+    )
+
+    return jsonify({"customers": customers})
+
+
+# =====================================================
+# CUSTOMER FULL DETAILS
+# =====================================================
+@app.route("/api/customers/<int:customer_id>/full-details", methods=["GET"])
+def customer_full_details(customer_id):
+
+    customer_list = execute(
+        sb().table(TABLE_CUSTOMERS)
+        .select("*")
+        .eq("id", customer_id)
+    )
+
+    if not customer_list:
+        return jsonify({"error": "Customer not found"}), 404
+
+    customer = customer_list[0]
+
+    vehicles = execute(
+        sb().table(TABLE_VEHICLES)
+        .select("*")
+        .eq("customer_id", customer_id)
+    )
+
+    for v in vehicles:
+        services = execute(
+            sb().table(TABLE_SERVICES)
+            .select("*")
+            .eq("vehicle_id", v["id"])
+        )
+        v["services"] = services
+
+    return jsonify({
+        "customer": customer,
+        "vehicles": vehicles
+    })
+
+
+# =====================================================
+# ERROR HANDLER
 # =====================================================
 @app.errorhandler(Exception)
 def handle_error(e):
