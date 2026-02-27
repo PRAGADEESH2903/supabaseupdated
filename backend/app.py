@@ -26,7 +26,7 @@ TABLE_PURCHASES = "purchases"
 TABLE_SUB_DEALERS = "sub_dealers"
 
 # =====================================================
-# SUPABASE HELPERS
+# SUPABASE HELPER FUNCTIONS
 # =====================================================
 def sb() -> Client:
     return get_supabase_client()
@@ -35,12 +35,9 @@ def sb() -> Client:
 def execute(query):
     try:
         response = query.execute()
-
         if hasattr(response, "error") and response.error:
             raise Exception(response.error.message)
-
         return response.data or []
-
     except Exception as e:
         print("SUPABASE ERROR:", str(e))
         raise Exception(str(e))
@@ -86,21 +83,19 @@ def health():
 # =====================================================
 # CUSTOMERS
 # =====================================================
-@app.route("/api/customers", methods=["GET"])
-def list_customers():
-    return jsonify(
-        execute(
-            sb().table(TABLE_CUSTOMERS)
-            .select("id,name,contact,email,address,city")
+@app.route("/api/customers", methods=["GET", "POST"])
+def customers():
+    if request.method == "GET":
+        return jsonify(
+            execute(
+                sb().table(TABLE_CUSTOMERS)
+                .select("id,name,contact,email,address,city")
+            )
         )
-    )
 
-
-@app.route("/api/customers", methods=["POST"])
-def create_customer():
     data = request.get_json() or {}
-
     required = ["name", "contact", "email", "address", "city"]
+
     for field in required:
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
@@ -112,54 +107,48 @@ def create_customer():
 # =====================================================
 # VEHICLES
 # =====================================================
-@app.route("/api/vehicles", methods=["GET"])
-def list_vehicles():
-    return jsonify(
-        execute(
-            sb().table(TABLE_VEHICLES)
-            .select("id,name,model,year,price,customer_id")
+@app.route("/api/vehicles", methods=["GET", "POST"])
+def vehicles():
+    if request.method == "GET":
+        return jsonify(
+            execute(
+                sb().table(TABLE_VEHICLES)
+                .select("id,name,model,year,price,customer_id")
+            )
         )
-    )
 
-
-@app.route("/api/vehicles", methods=["POST"])
-def create_vehicle():
     data = request.get_json() or {}
-
     required = ["name", "model", "year", "engine_no", "price", "customer_id"]
+
     for field in required:
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
 
-    try:
-        payload = {
-            "name": data["name"],
-            "model": data["model"],
-            "year": int(data["year"]),
-            "engine_no": data["engine_no"],
-            "chassis_no": data.get("chassis_no"),
-            "gearbox_no": data.get("gearbox_no"),
-            "battery_no": data.get("battery_no"),
-            "tire_front": data.get("tire_front"),
-            "tire_rear_left": data.get("tire_rear_left"),
-            "tire_rear_right": data.get("tire_rear_right"),
-            "tire_stepney": data.get("tire_stepney"),
-            "price": float(data["price"]),
-            "customer_id": int(data["customer_id"]),
-        }
+    payload = {
+        "name": data["name"],
+        "model": data["model"],
+        "year": to_int(data["year"]),
+        "engine_no": data["engine_no"],
+        "chassis_no": data.get("chassis_no"),
+        "gearbox_no": data.get("gearbox_no"),
+        "battery_no": data.get("battery_no"),
+        "tire_front": data.get("tire_front"),
+        "tire_rear_left": data.get("tire_rear_left"),
+        "tire_rear_right": data.get("tire_rear_right"),
+        "tire_stepney": data.get("tire_stepney"),
+        "price": to_float(data["price"]),
+        "customer_id": to_int(data["customer_id"]),
+    }
 
-        execute(sb().table(TABLE_VEHICLES).insert(payload))
-        return jsonify({"message": "Vehicle added"}), 201
-
-    except ValueError:
-        return jsonify({"error": "Invalid numeric value"}), 400
+    execute(sb().table(TABLE_VEHICLES).insert(payload))
+    return jsonify({"message": "Vehicle added"}), 201
 
 
 # =====================================================
 # SUB DEALERS
 # =====================================================
 @app.route("/api/sub-dealers", methods=["GET"])
-def list_sub_dealers():
+def sub_dealers():
     return jsonify(
         execute(
             sb().table(TABLE_SUB_DEALERS)
@@ -171,8 +160,16 @@ def list_sub_dealers():
 # =====================================================
 # PURCHASES
 # =====================================================
-@app.route("/api/purchases", methods=["POST"])
-def create_purchase():
+@app.route("/api/purchases", methods=["GET", "POST"])
+def purchases():
+
+    if request.method == "GET":
+        return jsonify(
+            execute(
+                sb().table(TABLE_PURCHASES).select("*")
+            )
+        )
+
     data = request.get_json() or {}
 
     required = ["vehicle_id", "payment_method", "owner_name"]
@@ -180,61 +177,54 @@ def create_purchase():
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
 
-    try:
-        payload = {
-            "vehicle_id": to_int(data.get("vehicle_id")),
-            "payment_method": data.get("payment_method"),
-            "owner_name": data.get("owner_name"),
-            "delivery_address": data.get("delivery_address"),
-            "purchase_date": parse_date(data.get("purchase_date")),
-            "delivery_date": parse_date(data.get("delivery_date")),
-            "insurance_start": parse_date(data.get("insurance_start")),
-            "insurance_end": parse_date(data.get("insurance_end")),
-            "dealer_id": to_int(data.get("dealer_id")),
-        }
+    payload = {
+        "vehicle_id": to_int(data.get("vehicle_id")),
+        "payment_method": data.get("payment_method"),
+        "owner_name": data.get("owner_name"),
+        "delivery_address": data.get("delivery_address"),
+        "purchase_date": parse_date(data.get("purchase_date")),
+        "delivery_date": parse_date(data.get("delivery_date")),
+        "insurance_start": parse_date(data.get("insurance_start")),
+        "insurance_end": parse_date(data.get("insurance_end")),
+        "dealer_id": to_int(data.get("dealer_id")),
+    }
 
-        if data.get("payment_method") == "loan":
-            payload.update({
-                "bank_name": data.get("bank_name") or None,
-                "loan_amount": to_float(data.get("loan_amount")),
-                "loan_tenure": to_int(data.get("loan_tenure")),
-                "interest_rate": to_float(data.get("interest_rate")),
-                "emi_amount": to_float(data.get("emi_amount")),
-                "down_payment": to_float(data.get("down_payment")),
-            })
-        else:
-            payload.update({
-                "bank_name": None,
-                "loan_amount": None,
-                "loan_tenure": None,
-                "interest_rate": None,
-                "emi_amount": None,
-                "down_payment": None,
-            })
+    if data.get("payment_method") == "loan":
+        payload.update({
+            "bank_name": data.get("bank_name") or None,
+            "loan_amount": to_float(data.get("loan_amount")),
+            "loan_tenure": to_int(data.get("loan_tenure")),
+            "interest_rate": to_float(data.get("interest_rate")),
+            "emi_amount": to_float(data.get("emi_amount")),
+            "down_payment": to_float(data.get("down_payment")),
+        })
+    else:
+        payload.update({
+            "bank_name": None,
+            "loan_amount": None,
+            "loan_tenure": None,
+            "interest_rate": None,
+            "emi_amount": None,
+            "down_payment": None,
+        })
 
-        execute(sb().table(TABLE_PURCHASES).insert(payload))
-        return jsonify({"message": "Purchase created"}), 201
-
-    except ValueError:
-        return jsonify({"error": "Invalid numeric value provided"}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    execute(sb().table(TABLE_PURCHASES).insert(payload))
+    return jsonify({"message": "Purchase created"}), 201
 
 
 # =====================================================
 # SERVICES
 # =====================================================
-@app.route("/api/services", methods=["GET"])
-def list_services():
-    return jsonify(
-        execute(
-            sb().table(TABLE_SERVICES).select("*")
+@app.route("/api/services", methods=["GET", "POST"])
+def services():
+
+    if request.method == "GET":
+        return jsonify(
+            execute(
+                sb().table(TABLE_SERVICES).select("*")
+            )
         )
-    )
 
-
-@app.route("/api/services", methods=["POST"])
-def create_service():
     data = request.get_json() or {}
 
     required = ["vehicle_id", "service_count"]
@@ -242,24 +232,20 @@ def create_service():
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
 
-    try:
-        payload = {
-            "vehicle_id": to_int(data.get("vehicle_id")),
-            "service_count": to_int(data.get("service_count")),
-            "status": data.get("status", "Pending"),
-            "service_date": parse_date(data.get("service_date")),
-            "remarks": data.get("remarks"),
-        }
+    payload = {
+        "vehicle_id": to_int(data.get("vehicle_id")),
+        "service_count": to_int(data.get("service_count")),
+        "status": data.get("status", "Pending"),
+        "service_date": parse_date(data.get("service_date")),
+        "remarks": data.get("remarks"),
+    }
 
-        execute(sb().table(TABLE_SERVICES).insert(payload))
-        return jsonify({"message": "Service added"}), 201
-
-    except ValueError:
-        return jsonify({"error": "Invalid numeric value"}), 400
+    execute(sb().table(TABLE_SERVICES).insert(payload))
+    return jsonify({"message": "Service added"}), 201
 
 
 # =====================================================
-# ERROR HANDLER
+# GLOBAL ERROR HANDLER
 # =====================================================
 @app.errorhandler(Exception)
 def handle_error(e):
