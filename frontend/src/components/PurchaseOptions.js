@@ -26,7 +26,6 @@ const validationSchema = Yup.object({
   insurance_end: Yup.string().required("Insurance end required"),
 });
 
-/* ================= COMPONENT ================= */
 export default function PurchaseOptions() {
   const [vehicles, setVehicles] = useState([]);
   const [dealers, setDealers] = useState([]);
@@ -35,12 +34,14 @@ export default function PurchaseOptions() {
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/vehicles`)
-      .then(res => setVehicles(res.data))
+    axios
+      .get(`${API_BASE_URL}/api/vehicles`)
+      .then((res) => setVehicles(res.data))
       .catch(() => setError("Vehicle fetch failed"));
 
-    axios.get(`${API_BASE_URL}/api/sub-dealers`)
-      .then(res => setDealers(res.data))
+    axios
+      .get(`${API_BASE_URL}/api/sub-dealers`)
+      .then((res) => setDealers(res.data))
       .catch(() => setDealers([]));
   }, []);
 
@@ -69,7 +70,12 @@ export default function PurchaseOptions() {
         setSuccess(false);
 
         const payload = {
-          vehicle_id: parseInt(values.vehicle_id),
+          vehicle_id: values.vehicle_id
+            ? parseInt(values.vehicle_id)
+            : null,
+          dealer_id: values.dealer_id
+            ? parseInt(values.dealer_id)
+            : null,
           payment_method: values.payment_method,
           owner_name: values.owner_name,
           delivery_address: values.delivery_address,
@@ -77,9 +83,6 @@ export default function PurchaseOptions() {
           purchase_date: values.purchase_date,
           insurance_start: values.insurance_start,
           insurance_end: values.insurance_end,
-          dealer_id: values.dealer_id
-            ? parseInt(values.dealer_id)
-            : null,
         };
 
         if (values.payment_method === "loan") {
@@ -106,47 +109,63 @@ export default function PurchaseOptions() {
         setSuccess(true);
         resetForm();
       } catch (err) {
-        setError(err.response?.data?.error || "Failed to submit purchase");
+        setError(
+          err.response?.data?.error || "Failed to submit purchase"
+        );
       }
     },
   });
 
-  /* ================= EMI CALCULATION ================= */
+  /* ================= SAFE EMI CALCULATION ================= */
+  const {
+    loan_amount,
+    loan_tenure,
+    interest_rate,
+    payment_method,
+    emi_amount,
+  } = formik.values;
+
   useEffect(() => {
     if (
-      formik.values.payment_method === "loan" &&
-      formik.values.loan_amount &&
-      formik.values.loan_tenure &&
-      formik.values.interest_rate
+      payment_method === "loan" &&
+      loan_amount &&
+      loan_tenure &&
+      interest_rate
     ) {
-      const P = parseFloat(formik.values.loan_amount);
-      const R = parseFloat(formik.values.interest_rate) / 100 / 12;
-      const N = parseInt(formik.values.loan_tenure) * 12;
+      const P = parseFloat(loan_amount);
+      const R = parseFloat(interest_rate) / 100 / 12;
+      const N = parseInt(loan_tenure) * 12;
 
       if (R > 0) {
         const emi =
           (P * R * Math.pow(1 + R, N)) /
           (Math.pow(1 + R, N) - 1);
 
-        if (formik.values.emi_amount !== emi.toFixed(2)) {
-          formik.setFieldValue("emi_amount", emi.toFixed(2));
+        const calculatedEmi = emi.toFixed(2);
+
+        if (emi_amount !== calculatedEmi) {
+          formik.setFieldValue("emi_amount", calculatedEmi);
         }
       }
     }
   }, [
-    formik.values.loan_amount,
-    formik.values.loan_tenure,
-    formik.values.interest_rate,
-    formik.values.payment_method,
+    loan_amount,
+    loan_tenure,
+    interest_rate,
+    payment_method,
+    emi_amount,
   ]);
 
+  /* ================= UI ================= */
   return (
     <Container maxWidth="sm">
       <Paper sx={{ p: 3, mt: 4 }}>
         <Typography variant="h5">Purchase</Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
-        {success && <Alert severity="success">Purchase Saved</Alert>}
+        {success && (
+          <Alert severity="success">Purchase Saved</Alert>
+        )}
 
         <form onSubmit={formik.handleSubmit}>
           <TextField
@@ -154,8 +173,6 @@ export default function PurchaseOptions() {
             fullWidth
             label="Vehicle"
             {...formik.getFieldProps("vehicle_id")}
-            error={formik.touched.vehicle_id && Boolean(formik.errors.vehicle_id)}
-            helperText={formik.touched.vehicle_id && formik.errors.vehicle_id}
             sx={{ mt: 2 }}
           >
             {vehicles.map((v) => (
@@ -241,18 +258,58 @@ export default function PurchaseOptions() {
             sx={{ mt: 2 }}
           />
 
-          {formik.values.payment_method === "loan" && (
+          {payment_method === "loan" && (
             <>
-              <TextField fullWidth label="Bank Name" {...formik.getFieldProps("bank_name")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Loan Amount" type="number" {...formik.getFieldProps("loan_amount")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Loan Tenure (Years)" type="number" {...formik.getFieldProps("loan_tenure")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Interest Rate (%)" type="number" {...formik.getFieldProps("interest_rate")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="EMI Amount" disabled {...formik.getFieldProps("emi_amount")} sx={{ mt: 2 }} />
-              <TextField fullWidth label="Down Payment" type="number" {...formik.getFieldProps("down_payment")} sx={{ mt: 2 }} />
+              <TextField
+                fullWidth
+                label="Bank Name"
+                {...formik.getFieldProps("bank_name")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Loan Amount"
+                type="number"
+                {...formik.getFieldProps("loan_amount")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Loan Tenure (Years)"
+                type="number"
+                {...formik.getFieldProps("loan_tenure")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Interest Rate (%)"
+                type="number"
+                {...formik.getFieldProps("interest_rate")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="EMI Amount"
+                disabled
+                {...formik.getFieldProps("emi_amount")}
+                sx={{ mt: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Down Payment"
+                type="number"
+                {...formik.getFieldProps("down_payment")}
+                sx={{ mt: 2 }}
+              />
             </>
           )}
 
-          <Button type="submit" fullWidth variant="contained" sx={{ mt: 3 }}>
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3 }}
+          >
             Submit
           </Button>
         </form>
